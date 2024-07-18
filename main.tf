@@ -1,93 +1,119 @@
-# Fournisseur Azure
-provider "azurerm" {
-  features {}
-}
-
-# Ressource groupe
+# Resource Group
 resource "azurerm_resource_group" "rg" {
-  name     = "rg-hello-world"
-  location = "West Europe"
+  name     = var.resource_group_name
+  location = var.location
 }
 
-# Réseau Virtuel
-resource "azurerm_virtual_network" "vnet" {
-  name                = "vnet-hello-world"
-  address_space       = ["10.0.0.0/16"]
-  location            = azurerm_resource_group.rg.location
+# Public IP
+resource "azurerm_public_ip" "lb_pip" {
+  name                = "lbPublicIP"
+  location            = var.location
   resource_group_name = azurerm_resource_group.rg.name
+  allocation_method   = "Static"
+  sku                 = "Standard"
 }
 
-# Sous-réseau
-resource "azurerm_subnet" "subnet" {
-  name                 = "subnet-hello-world"
-  resource_group_name  = azurerm_resource_group.rg.name
-  virtual_network_name = azurerm_virtual_network.vnet.name
-  address_prefixes     = ["10.0.1.0/24"]
-}
-
-# Groupe de sécurité réseau (NSG)
-resource "azurerm_network_security_group" "nsg" {
-  name                = "nsg-hello-world"
-  location            = azurerm_resource_group.rg.location
+# Load Balancer
+resource "azurerm_lb" "my_lb" {
+  name                = "myLoadBalancer"
+  location            = var.location
   resource_group_name = azurerm_resource_group.rg.name
+  sku                 = "Standard"
 
-  security_rule {
-    name                       = "Allow-FTP"
-    priority                   = 100
-    direction                  = "Inbound"
-    access                     = "Allow"
-    protocol                   = "Tcp"
-    source_port_range          = "*"
-    destination_port_range     = "21"
-    source_address_prefix      = "*"
-    destination_address_prefix = "*"
-  }
-
-  security_rule {
-    name                       = "Allow-HTTP"
-    priority                   = 200
-    direction                  = "Inbound"
-    access                     = "Allow"
-    protocol                   = "Tcp"
-    source_port_range          = "*"
-    destination_port_range     = "80"
-    source_address_prefix      = "*"
-    destination_address_prefix = "*"
+  frontend_ip_configuration {
+    name                 = "PublicIPAddress"
+    public_ip_address_id = azurerm_public_ip.lb_pip.id
   }
 }
 
-# Association du NSG avec le sous-réseau
-resource "azurerm_subnet_network_security_group_association" "association" {
-  subnet_id                 = azurerm_subnet.subnet.id
-  network_security_group_id = azurerm_network_security_group.nsg.id
+resource "azurerm_lb_backend_address_pool" "bpepool" {
+  loadbalancer_id = azurerm_lb.my_lb.id
+  name            = "BackendPool"
 }
 
-# Azure Service Plan (remplace azurerm_app_service_plan)
+resource "azurerm_lb_probe" "http_probe" {
+  loadbalancer_id     = azurerm_lb.my_lb.id
+  name                = "http_probe"
+  protocol            = "Http"
+  port                = 80
+  request_path        = "/"
+  interval_in_seconds = 5
+  number_of_probes    = 2
+}
+
+resource "azurerm_lb_rule" "http_rule" {
+  loadbalancer_id                = azurerm_lb.my_lb.id
+  name                           = "http_rule"
+  protocol                       = "Tcp"
+  frontend_port                  = 80
+  backend_port                   = 80
+  frontend_ip_configuration_name = "PublicIPAddress"
+  backend_address_pool_ids       = [azurerm_lb_backend_address_pool.bpepool.id]
+  probe_id                       = azurerm_lb_probe.http_probe.id
+}
+
+# App Service Plan
 resource "azurerm_service_plan" "asp" {
-  name                = "asp-hello-world"
-  location            = azurerm_resource_group.rg.location
+  name                = var.app_service_plan_name
+  location            = var.location
   resource_group_name = azurerm_resource_group.rg.name
   os_type             = "Linux"
   sku_name            = "B1"
 }
 
-# Azure Linux Web App
-resource "azurerm_linux_web_app" "app" {
-  name                = "app-hello-world"
-  location            = azurerm_resource_group.rg.location
+# Web App 1
+resource "azurerm_linux_web_app" "web_app_1" {
+  name                = var.web_app_1_name
+  location            = var.location
   resource_group_name = azurerm_resource_group.rg.name
   service_plan_id     = azurerm_service_plan.asp.id
+
+  site_config {
+    default_documents = ["palopasalto.html"]
+  }
 
   app_settings = {
     "WEBSITE_RUN_FROM_PACKAGE" = "1"
   }
+}
+
+# Web App 2
+resource "azurerm_linux_web_app" "web_app_2" {
+  name                = var.web_app_2_name
+  location            = var.location
+  resource_group_name = azurerm_resource_group.rg.name
+  service_plan_id     = azurerm_service_plan.asp.id
 
   site_config {
-    ftps_state = "AllAllowed"
+    default_documents = ["palopasalto.html"]
+  }
+
+  app_settings = {
+    "WEBSITE_RUN_FROM_PACKAGE" = "1"
   }
 }
 
-# Sortie URL de l'application
-output "web_app_url" {
-  value = "https://${azurerm_linux_web_app.app.default_hostname}"
+# Blob Storage Account
+resource "azurerm_storage_account" "storage_account" {
+  name                     = var.storage_account_name
+  resource_group_name      = azurerm_resource_group.rg.name
+  location                 = var.location
+  account_tier             = "Standard"
+  account_replication_type = "LRS"
+}
+
+# Blob Container
+resource "azurerm_storage_container" "static_files" {
+  name                  = "staticfiles"
+  storage_account_name  = azurerm_storage_account.storage_account.name
+  container_access_type = "private"
+}
+
+# Blob File for palopasalto
+resource "azurerm_storage_blob" "palopasalto_html" {
+  name                   = "palopasalto.html"
+  storage_account_name   = azurerm_storage_account.storage_account.name
+  storage_container_name = azurerm_storage_container.static_files.name
+  type                   = "Block"
+  source                 = "path/to/palopasalto.html"
 }
