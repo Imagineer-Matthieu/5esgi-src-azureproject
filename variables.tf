@@ -1,23 +1,23 @@
 variable "resource_group_name" {
-  default = "5ESGISRC-RG"
+  default = "5ESGISRC-RG-ProjectAzure"
 }
 
 variable "location" {
-  default = "West Europe"
+  default = "francecentral"
 }
 
 variable "app_service_plan_name" {
-  default = "5ESGISRC-AppServicePlan"
+  default = "5esgisrc-asp-palopasalto"
 }
 
 variable "web_app_1_name" {
-  default = "webapp1"
+  default = "5esgisrc-webapp1-palopasalto"
 }
 
 variable "web_app_2_name" {
-  default = "webapp2"
+  default = "5esgisrc-webapp2-palopasalto"
 }
 
 variable "storage_account_name" {
-  default = "5esgisrcstorage"
+  default = "5esgisrcblobstorage"
 }

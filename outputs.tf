@@ -21,3 +21,7 @@ output "storage_account_name" {
 output "storage_container_name" {
   value = azurerm_storage_container.static_files.name
 }
+
+output "palopasalto_blob_url" {
+  value = azurerm_storage_blob.palopasalto_html.url
+}

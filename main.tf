@@ -55,7 +55,7 @@ resource "azurerm_lb_rule" "http_rule" {
 # App Service Plan
 resource "azurerm_service_plan" "asp" {
   name                = var.app_service_plan_name
-  location            = var.location
+  location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
   os_type             = "Linux"
   sku_name            = "B1"
@@ -64,7 +64,7 @@ resource "azurerm_service_plan" "asp" {
 # Web App 1
 resource "azurerm_linux_web_app" "web_app_1" {
   name                = var.web_app_1_name
-  location            = var.location
+  location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
   service_plan_id     = azurerm_service_plan.asp.id
 
@@ -74,13 +74,14 @@ resource "azurerm_linux_web_app" "web_app_1" {
 
   app_settings = {
     "WEBSITE_RUN_FROM_PACKAGE" = "1"
+    "PalopasaltoBlobUrl"       = "${azurerm_storage_account.storage_account.primary_blob_endpoint}${azurerm_storage_container.static_files.name}/palopasalto.html"
   }
 }
 
 # Web App 2
 resource "azurerm_linux_web_app" "web_app_2" {
   name                = var.web_app_2_name
-  location            = var.location
+  location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
   service_plan_id     = azurerm_service_plan.asp.id
 
@@ -90,6 +91,7 @@ resource "azurerm_linux_web_app" "web_app_2" {
 
   app_settings = {
     "WEBSITE_RUN_FROM_PACKAGE" = "1"
+    "PalopasaltoBlobUrl"       = "${azurerm_storage_account.storage_account.primary_blob_endpoint}${azurerm_storage_container.static_files.name}/palopasalto.html"
   }
 }
 
@@ -106,7 +108,9 @@ resource "azurerm_storage_account" "storage_account" {
 resource "azurerm_storage_container" "static_files" {
   name                  = "staticfiles"
   storage_account_name  = azurerm_storage_account.storage_account.name
-  container_access_type = "private"
+  container_access_type = "blob"  # Permet l'accès direct aux blobs pour le contenu public
+
+  depends_on = [azurerm_storage_account.storage_account]
 }
 
 # Blob File for palopasalto
@@ -115,5 +119,5 @@ resource "azurerm_storage_blob" "palopasalto_html" {
   storage_account_name   = azurerm_storage_account.storage_account.name
   storage_container_name = azurerm_storage_container.static_files.name
   type                   = "Block"
-  source                 = "path/to/palopasalto.html"
+  source                 = "./palopasalto.html" # Chemin relatif mis à jour
 }
